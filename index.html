@@ -66,6 +66,20 @@
         overflow: hidden;
       }
 
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background: linear-gradient(
+          to top,
+          rgba(8, 20, 36, 0.72) 0%,
+          rgba(8, 20, 36, 0.44) 38%,
+          rgba(8, 20, 36, 0.05) 72%
+        );
+      }
+
       .hero-bg {
         position: absolute;
         inset: 0;
@@ -110,8 +124,8 @@
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
-        background: rgba(168, 204, 224, 0.25);
-        border: 1px solid rgba(46, 111, 163, 0.4);
+        background: rgba(14, 33, 58, 0.62);
+        border: 1px solid rgba(168, 204, 224, 0.42);
         color: #ffffff;
         font-family: "Syne", sans-serif;
         font-size: 0.7rem;
@@ -121,6 +135,7 @@
         border-radius: 100px;
         margin-bottom: 2rem;
         width: fit-content;
+        box-shadow: 0 10px 26px rgba(4, 12, 24, 0.38);
       }
 
       .hero-tag::before {
@@ -153,19 +168,13 @@
         line-height: 1.05;
         letter-spacing: -0.03em;
         max-width: 14ch;
+        color: #f7fbff;
+        text-shadow: 0 10px 34px rgba(3, 9, 18, 0.72);
       }
 
       .hero h1 em {
         font-style: normal;
-        background: linear-gradient(
-          135deg,
-          #a8cce0 0%,
-          #ffffff 50%,
-          #a8cce0 100%
-        );
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+        color: #eaf6ff;
       }
 
       .hero-meta {
@@ -176,7 +185,8 @@
         gap: 2rem;
         margin-top: 2.5rem;
         font-size: 0.85rem;
-        color: var(--muted);
+        color: #d3e6f6;
+        text-shadow: 0 2px 12px rgba(4, 12, 24, 0.55);
       }
 
       .hero-meta span {
@@ -193,7 +203,7 @@
         align-items: center;
         gap: 1rem;
         font-size: 0.75rem;
-        color: var(--muted);
+        color: #c5dbef;
         letter-spacing: 0.08em;
         text-transform: uppercase;
       }
@@ -203,7 +213,7 @@
         flex: 1;
         max-width: 80px;
         height: 1px;
-        background: linear-gradient(90deg, var(--muted), transparent);
+        background: linear-gradient(90deg, #c5dbef, transparent);
       }
 
       /* ── LAYOUT ── */
@@ -1012,6 +1022,11 @@
               can do is limited. But if they get hold of an admin account, they
               can take over everything. PAM prevents that escalation.
             </p>
+            <img
+              src="pam-logo.png"
+              alt="PAM illustration"
+              style="display: block; width: min(100%, 420px); height: auto; margin-top: 1.2rem; filter: drop-shadow(0 8px 20px rgba(26, 47, 78, 0.22));"
+            />
           </div>
 
           <div class="bouncer-cards reveal">
