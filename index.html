@@ -1,981 +1,1629 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>What is PAM & Why Should You Care?</title>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
-  <style>
-    :root {
-      --bg: #f4f7fb;
-      --surface: #ffffff;
-      --surface2: #e8f0f8;
-      --border: #c8d9ea;
-      --accent: #2e6fa3;
-      --accent2: #1a2f4e;
-      --accent3: #4a90c4;
-      --text: #1a2f4e;
-      --muted: #5a7a99;
-      --highlight: rgba(46,111,163,0.07);
-    }
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'DM Sans', sans-serif;
-      font-weight: 300;
-      line-height: 1.75;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* ── NOISE OVERLAY ── */
-    body::before {
-      content: '';
-      position: fixed; inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-      pointer-events: none; z-index: 0; opacity: .4;
-    }
-
-    /* ── HERO ── */
-    .hero {
-      position: relative;
-      min-height: 100vh;
-      display: flex; flex-direction: column; justify-content: flex-end;
-      padding: 5rem clamp(1.5rem, 8vw, 8rem) clamp(3rem, 8vh, 6rem);
-      overflow: hidden;
-    }
-
-    .hero-bg {
-      position: absolute; inset: 0; z-index: 0;
-      background:
-        radial-gradient(ellipse 70% 60% at 80% 20%, rgba(46,111,163,.18) 0%, transparent 70%),
-        radial-gradient(ellipse 50% 50% at 10% 80%, rgba(168,204,224,.4) 0%, transparent 60%),
-        radial-gradient(ellipse 80% 80% at 50% 50%, rgba(26,47,78,1) 40%, transparent 100%);
-    }
-
-    .hero-grid {
-      position: absolute; inset: 0; z-index: 0;
-      background-image:
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
-      background-size: 60px 60px;
-      mask-image: radial-gradient(ellipse 80% 80% at 50% 30%, black 20%, transparent 80%);
-      opacity: .35;
-    }
-
-    .hero-tag {
-      position: relative; z-index: 1;
-      display: inline-flex; align-items: center; gap: .5rem;
-      background: rgba(168,204,224,.25);
-      border: 1px solid rgba(46,111,163,.4);
-      color: #ffffff;
-      font-family: 'Syne', sans-serif;
-      font-size: .7rem; letter-spacing: .12em; text-transform: uppercase;
-      padding: .35rem .85rem; border-radius: 100px;
-      margin-bottom: 2rem;
-      width: fit-content;
-    }
-
-    .hero-tag::before {
-      content: '';
-      width: 6px; height: 6px;
-      background: var(--accent);
-      border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%,100% { opacity: 1; transform: scale(1); }
-      50% { opacity: .4; transform: scale(.7); }
-    }
-
-    .hero h1 {
-      position: relative; z-index: 1;
-      font-family: 'Syne', sans-serif;
-      font-size: clamp(2.8rem, 7vw, 6rem);
-      font-weight: 800;
-      line-height: 1.05;
-      letter-spacing: -.03em;
-      max-width: 14ch;
-    }
-
-    .hero h1 em {
-      font-style: normal;
-      background: linear-gradient(135deg, #a8cce0 0%, #ffffff 50%, #a8cce0 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .hero-meta {
-      position: relative; z-index: 1;
-      display: flex; align-items: center; gap: 2rem;
-      margin-top: 2.5rem;
-      font-size: .85rem; color: var(--muted);
-    }
-
-    .hero-meta span { display: flex; align-items: center; gap: .4rem; }
-
-    .scroll-hint {
-      position: relative; z-index: 1;
-      margin-top: 3rem;
-      display: flex; align-items: center; gap: 1rem;
-      font-size: .75rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase;
-    }
-
-    .scroll-hint::after {
-      content: '';
-      flex: 1; max-width: 80px;
-      height: 1px;
-      background: linear-gradient(90deg, var(--muted), transparent);
-    }
-
-    /* ── LAYOUT ── */
-    .container {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 0 clamp(1.5rem, 6vw, 5rem);
-    }
-
-    /* ── SECTION TITLES ── */
-    .section-label {
-      display: inline-flex; align-items: center; gap: .6rem;
-      font-family: 'Syne', sans-serif;
-      font-size: .7rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 1.2rem;
-    }
-
-    .section-label::before {
-      content: '';
-      width: 24px; height: 1px;
-      background: var(--accent);
-    }
-
-    h2 {
-      font-family: 'Syne', sans-serif;
-      font-size: clamp(1.8rem, 4vw, 2.8rem);
-      font-weight: 700;
-      line-height: 1.15;
-      letter-spacing: -.02em;
-      margin-bottom: 1.2rem;
-    }
-
-    p { margin-bottom: 1.2rem; color: #3a5570; }
-    p:last-child { margin-bottom: 0; }
-
-    /* ── WHAT IS PAM ── */
-    .what-is-pam {
-      padding: clamp(5rem, 10vh, 8rem) 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .pam-intro-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4rem;
-      align-items: start;
-      margin-top: 3rem;
-    }
-
-    @media (max-width: 768px) {
-      .pam-intro-grid { grid-template-columns: 1fr; gap: 2.5rem; }
-    }
-
-    /* ── BOUNCER CARDS ── */
-    .bouncer-cards {
-      display: flex; flex-direction: column; gap: 1rem;
-    }
-
-    .bouncer-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--accent);
-      border-radius: 10px;
-      padding: 1.2rem 1.4rem;
-      display: flex; align-items: flex-start; gap: 1rem;
-      transition: transform .2s, border-color .2s, box-shadow .2s;
-    }
-
-    .bouncer-card:nth-child(2) { border-left-color: var(--accent2); }
-    .bouncer-card:nth-child(3) { border-left-color: var(--accent3); }
-
-    .bouncer-card:hover {
-      transform: translateX(4px);
-      box-shadow: -4px 0 20px rgba(0,194,255,.15);
-    }
-
-    .bouncer-card:nth-child(2):hover { box-shadow: -4px 0 20px rgba(255,107,53,.15); }
-    .bouncer-card:nth-child(3):hover { box-shadow: -4px 0 20px rgba(124,58,237,.15); }
-
-    .card-icon {
-      font-size: 1.4rem; line-height: 1;
-      flex-shrink: 0;
-      margin-top: .1rem;
-    }
-
-    .card-title {
-      font-family: 'Syne', sans-serif;
-      font-size: .85rem; font-weight: 700;
-      letter-spacing: .02em;
-      color: var(--text);
-      margin-bottom: .3rem;
-    }
-
-    .card-body { font-size: .85rem; color: var(--muted); line-height: 1.5; }
-
-    /* ── QUOTE BOX ── */
-    .quote-box {
-      position: relative;
-      background: linear-gradient(135deg, rgba(46,111,163,.06) 0%, rgba(168,204,224,.15) 100%);
-      border: 1px solid rgba(46,111,163,.25);
-      border-radius: 16px;
-      padding: 2.5rem;
-      overflow: hidden;
-    }
-
-    .quote-box::before {
-      content: '"';
-      position: absolute; top: -1rem; left: 1.5rem;
-      font-family: 'Syne', sans-serif;
-      font-size: 8rem; font-weight: 800;
-      color: rgba(46,111,163,.12);
-      line-height: 1;
-      pointer-events: none;
-    }
-
-    .quote-text {
-      font-family: 'Syne', sans-serif;
-      font-size: 1.2rem; font-weight: 600;
-      line-height: 1.5;
-      color: var(--text);
-      margin-bottom: 1rem;
-    }
-
-    .quote-sub { font-size: .85rem; color: var(--muted); margin: 0; }
-
-    /* ── IAM vs PAM ── */
-    .iam-pam {
-      padding: clamp(5rem, 10vh, 8rem) 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .analogy-strip {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      gap: 1.5rem;
-      align-items: center;
-      margin: 3rem 0;
-    }
-
-    @media (max-width: 640px) {
-      .analogy-strip { grid-template-columns: 1fr; }
-      .vs-circle { display: none; }
-    }
-
-    .analogy-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2rem;
-      text-align: center;
-      transition: transform .3s, box-shadow .3s;
-    }
-
-    .analogy-card:hover { transform: translateY(-4px); }
-
-    .analogy-card.iam { border-top: 3px solid #4a90c4; }
-    .analogy-card.pam { border-top: 3px solid var(--accent2); }
-
-    .analogy-card.iam:hover { box-shadow: 0 12px 40px rgba(74,144,196,.15); }
-    .analogy-card.pam:hover { box-shadow: 0 12px 40px rgba(26,47,78,.15); }
-
-    .analogy-emoji { font-size: 2.5rem; margin-bottom: 1rem; }
-
-    .analogy-title {
-      font-family: 'Syne', sans-serif;
-      font-size: 1.1rem; font-weight: 700;
-      margin-bottom: .6rem; color: var(--text);
-    }
-
-    .analogy-desc { font-size: .85rem; color: var(--muted); line-height: 1.5; margin: 0; }
-
-    .vs-circle {
-      width: 48px; height: 48px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'Syne', sans-serif;
-      font-size: .75rem; font-weight: 800;
-      color: var(--muted);
-      flex-shrink: 0;
-    }
-
-    /* ── COMPARISON TABLE ── */
-    .table-wrap {
-      margin-top: 3rem;
-      overflow-x: auto;
-      border-radius: 16px;
-      border: 1px solid var(--border);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: .875rem;
-    }
-
-    thead tr {
-      background: #1a2f4e;
-    }
-
-    thead th {
-      font-family: 'Syne', sans-serif;
-      font-size: .7rem; letter-spacing: .1em; text-transform: uppercase;
-      font-weight: 700;
-      padding: 1.1rem 1.4rem;
-      text-align: left;
-      border-bottom: 1px solid var(--border);
-      color: #ffffff;
-    }
-
-    thead th:nth-child(2) { color: #a8cce0; }
-    thead th:nth-child(3) { color: #7bb8d9; }
-
-    tbody tr {
-      border-bottom: 1px solid var(--border);
-      transition: background .2s;
-    }
-
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--highlight); }
-
-    tbody td {
-      padding: .9rem 1.4rem;
-      color: #3a5570;
-      vertical-align: top;
-    }
-
-    tbody td:first-child {
-      font-family: 'Syne', sans-serif;
-      font-size: .75rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
-      color: var(--muted);
-      white-space: nowrap;
-    }
-
-    /* ── THREE PILLARS ── */
-    .pillars {
-      padding: clamp(5rem, 10vh, 8rem) 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .pillars-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.5rem;
-      margin-top: 3rem;
-    }
-
-    @media (max-width: 768px) {
-      .pillars-grid { grid-template-columns: 1fr; }
-    }
-
-    .pillar-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2rem;
-      position: relative;
-      overflow: hidden;
-      transition: transform .3s, box-shadow .3s;
-    }
-
-    .pillar-card:hover { transform: translateY(-6px); }
-
-    .pillar-card.people { border-top: 3px solid #4a90c4; }
-    .pillar-card.technology { border-top: 3px solid var(--accent); }
-    .pillar-card.process { border-top: 3px solid #1a2f4e; }
-
-    .pillar-card.people:hover { box-shadow: 0 16px 48px rgba(74,144,196,.15); }
-    .pillar-card.technology:hover { box-shadow: 0 16px 48px rgba(46,111,163,.15); }
-    .pillar-card.process:hover { box-shadow: 0 16px 48px rgba(26,47,78,.15); }
-
-    .pillar-num {
-      position: absolute; top: 1.2rem; right: 1.4rem;
-      font-family: 'Syne', sans-serif;
-      font-size: 3.5rem; font-weight: 800;
-      color: rgba(255,255,255,.04);
-      line-height: 1;
-    }
-
-    .pillar-icon { font-size: 2rem; margin-bottom: 1.2rem; }
-
-    .pillar-title {
-      font-family: 'Syne', sans-serif;
-      font-size: 1.1rem; font-weight: 700;
-      margin-bottom: 1rem; color: var(--text);
-    }
-
-    .pillar-items {
-      list-style: none;
-      display: flex; flex-direction: column; gap: .45rem;
-    }
-
-    .pillar-items li {
-      font-size: .82rem; color: var(--muted);
-      display: flex; align-items: center; gap: .5rem;
-    }
-
-    .pillar-items li::before {
-      content: '';
-      width: 5px; height: 5px;
-      border-radius: 50%;
-      background: currentColor;
-      flex-shrink: 0;
-    }
-
-    .people .pillar-items li::before { color: #4a90c4; }
-    .technology .pillar-items li::before { color: var(--accent); }
-    .process .pillar-items li::before { color: #1a2f4e; }
-
-    /* ── WORKFLOW ── */
-    .workflow {
-      padding: clamp(5rem, 10vh, 8rem) 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .workflow-steps {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      margin-top: 3rem;
-      position: relative;
-    }
-
-    .workflow-steps::before {
-      content: '';
-      position: absolute;
-      left: 2rem; top: 2.5rem; bottom: 2.5rem;
-      width: 2px;
-      background: linear-gradient(to bottom, #4a90c4, #2e6fa3, #1a2f4e);
-    }
-
-    @media (max-width: 640px) {
-      .workflow-steps::before { left: 1.5rem; }
-    }
-
-    .step-item {
-      display: flex;
-      gap: 2rem;
-      padding: 1.5rem 0;
-    }
-
-    @media (max-width: 640px) {
-      .step-item { gap: 1.2rem; }
-    }
-
-    .step-circle {
-      width: 4rem; height: 4rem;
-      background: var(--surface2);
-      border: 2px solid var(--border);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-      font-family: 'Syne', sans-serif;
-      font-size: 1.1rem; font-weight: 800;
-      color: var(--accent);
-      position: relative; z-index: 1;
-      transition: background .3s, border-color .3s;
-    }
-
-    .step-item:hover .step-circle {
-      background: rgba(46,111,163,.12);
-      border-color: var(--accent);
-      box-shadow: 0 0 20px rgba(46,111,163,.25);
-    }
-
-    .step-content {
-      padding: .6rem 0;
-      flex: 1;
-    }
-
-    .step-title {
-      font-family: 'Syne', sans-serif;
-      font-size: 1rem; font-weight: 700;
-      color: var(--text);
-      margin-bottom: .4rem;
-    }
-
-    .step-desc { font-size: .875rem; color: var(--muted); line-height: 1.6; margin: 0; }
-
-    .step-badge {
-      display: inline-flex; align-items: center;
-      background: rgba(46,111,163,.1);
-      border: 1px solid rgba(46,111,163,.25);
-      color: var(--accent);
-      font-size: .65rem; letter-spacing: .08em; text-transform: uppercase;
-      font-family: 'Syne', sans-serif; font-weight: 600;
-      padding: .2rem .6rem; border-radius: 100px;
-      margin-top: .5rem;
-    }
-
-    /* ── WHY PAM MATTERS ── */
-    .why-pam {
-      padding: clamp(5rem, 10vh, 8rem) 0;
-    }
-
-    .why-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 3rem;
-      margin-top: 3rem;
-      align-items: center;
-    }
-
-    @media (max-width: 768px) {
-      .why-grid { grid-template-columns: 1fr; }
-    }
-
-    .stat-block {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.2rem;
-    }
-
-    .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 1.6rem;
-      transition: transform .2s;
-    }
-
-    .stat-card:hover { transform: scale(1.03); }
-
-    .stat-card:nth-child(1) { border-top: 2px solid var(--accent); }
-    .stat-card:nth-child(2) { border-top: 2px solid #4a90c4; }
-    .stat-card:nth-child(3) { border-top: 2px solid var(--accent2); }
-    .stat-card:nth-child(4) { border-top: 2px solid #a8cce0; }
-
-    .stat-value {
-      font-family: 'Syne', sans-serif;
-      font-size: 2rem; font-weight: 800;
-      line-height: 1;
-      margin-bottom: .4rem;
-    }
-
-    .stat-card:nth-child(1) .stat-value { color: var(--accent); }
-    .stat-card:nth-child(2) .stat-value { color: #4a90c4; }
-    .stat-card:nth-child(3) .stat-value { color: var(--accent2); }
-    .stat-card:nth-child(4) .stat-value { color: #2e6fa3; }
-
-    .stat-label { font-size: .78rem; color: var(--muted); line-height: 1.4; }
-
-    /* ── FOOTER ── */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 3rem 0;
-      text-align: center;
-      background: #1a2f4e;
-    }
-
-    .footer-logo {
-      font-family: 'Syne', sans-serif;
-      font-size: 1.3rem; font-weight: 800;
-      background: linear-gradient(135deg, #a8cce0, #ffffff);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: .8rem;
-    }
-
-    .footer-sub { font-size: .8rem; color: #a8cce0; }
-
-    /* ── ANIMATIONS ── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(24px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    .fade-up {
-      opacity: 0;
-      animation: fadeUp .7s ease forwards;
-    }
-
-    .fade-up:nth-child(1) { animation-delay: .1s; }
-    .fade-up:nth-child(2) { animation-delay: .2s; }
-    .fade-up:nth-child(3) { animation-delay: .3s; }
-    .fade-up:nth-child(4) { animation-delay: .4s; }
-    .fade-up:nth-child(5) { animation-delay: .5s; }
-
-    .reveal {
-      opacity: 0;
-      transform: translateY(20px);
-      transition: opacity .6s ease, transform .6s ease;
-    }
-
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  </style>
-</head>
-<body>
-
-  <!-- ══ NAV ══ -->
-  <nav style="position:fixed; top:0; left:0; right:0; z-index:100; background:rgba(26,47,78,.95); backdrop-filter:blur(12px); border-bottom:1px solid rgba(168,204,224,.15); padding:.9rem clamp(1.5rem,6vw,5rem); display:flex; align-items:center; justify-content:space-between;">
-    <div style="display:flex; align-items:center; gap:.75rem;">
-      <img src="logo.png" alt="The Packet Sniffers" style="height:32px; width:auto; filter:brightness(0) invert(1);"/>
-      <span style="font-family:'Syne',sans-serif; font-weight:800; font-size:1rem; color:#ffffff; letter-spacing:-.01em;">The Packet Sniffers</span>
-    </div>
-    <span style="font-family:'Syne',sans-serif; font-size:.65rem; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#a8cce0; background:rgba(168,204,224,.1); border:1px solid rgba(168,204,224,.2); padding:.3rem .8rem; border-radius:100px;">PAM Blog</span>
-  </nav>
-
-  <!-- ══ HERO ══ -->
-  <section class="hero">
-    <div class="hero-bg"></div>
-    <div class="hero-grid"></div>
-
-    <div class="fade-up">
-      <img src="logo.png" alt="The Packet Sniffers" style="width: clamp(120px, 18vw, 200px); margin-bottom: 2rem; filter: drop-shadow(0 4px 24px rgba(0,0,0,.4));"/>
-    </div>
-
-    <div class="fade-up">
-      <div class="hero-tag">Cybersecurity Explainer</div>
-    </div>
-
-    <h1 class="fade-up">
-      What is <em>Privileged Access Management</em> and why should you care?
-    </h1>
-
-    <div class="hero-meta fade-up">
-      <span>🔒 PAM Deep Dive</span>
-      <span>·</span>
-      <span>5 min read</span>
-      <span>·</span>
-      <span>Security Fundamentals</span>
-    </div>
-
-    <div class="scroll-hint fade-up">Scroll to explore</div>
-  </section>
-
-  <!-- ══ WHAT IS PAM ══ -->
-  <section class="what-is-pam">
-    <div class="container">
-      <div class="section-label">Foundation</div>
-      <h2>The gatekeeper for the keys to the kingdom</h2>
-
-      <div class="pam-intro-grid">
-        <div>
-          <p>Your daily interactions online and at work are often shaped by Privileged Access Management. You may have experienced the effects — and sometimes the frustrations — without realising what's being controlled behind the scenes.</p>
-          <p>PAM makes sure that the most "powerful" accounts can only be used by the right people, at the right time, and only for the specific tasks they are allowed to perform.</p>
-          <p>It does this by controlling access, monitoring activity and shutting down anything that looks risky or unexpected.</p>
-          <p>If an attacker compromises a normal user account, the damage they can do is limited. But if they get hold of an admin account, they can take over everything. PAM prevents that escalation.</p>
-        </div>
-
-        <div class="bouncer-cards reveal">
-          <div class="bouncer-card fade-up">
-            <div class="card-icon">🚫</div>
-            <div>
-              <div class="card-title">Bouncer for Dangerous Accounts</div>
-              <div class="card-body">Domain admins, database admins, root and cloud super-users are guarded at the door.</div>
-            </div>
-          </div>
-          <div class="bouncer-card fade-up">
-            <div class="card-icon">⚖️</div>
-            <div>
-              <div class="card-title">Enforces Least Privilege</div>
-              <div class="card-body">Users get only the minimum access they need — nothing more, nothing less.</div>
-            </div>
-          </div>
-          <div class="bouncer-card fade-up">
-            <div class="card-icon">📋</div>
-            <div>
-              <div class="card-title">Records & Audits Everything</div>
-              <div class="card-body">Every privileged action is logged so you always know who did what, and when.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="quote-box reveal" style="margin-top: 4rem;">
-        <div class="quote-text">Simply put, PAM is the gatekeeper for the keys to the kingdom.</div>
-        <p class="quote-sub">The most critical accounts in any organisation deserve the strictest protection.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ IAM vs PAM ══ -->
-  <section class="iam-pam">
-    <div class="container">
-      <div class="section-label">Comparison</div>
-      <h2>PAM vs IAM — What's the difference?</h2>
-      <p style="max-width: 60ch;">IAM and PAM sound similar but serve different purposes. Think of IAM as identity validation and PAM as resource access validation.</p>
-
-      <div class="analogy-strip reveal">
-        <div class="analogy-card iam">
-          <div class="analogy-emoji">🏢</div>
-          <div class="analogy-title">IAM — Reception Desk</div>
-          <p class="analogy-desc">Verifies who you are, issues you a badge, and determines which floors and rooms you can access. Applies to every employee, contractor, and system identity.</p>
-        </div>
-
-        <div class="vs-circle">VS</div>
-
-        <div class="analogy-card pam">
-          <div class="analogy-emoji">🔐</div>
-          <div class="analogy-title">PAM — The Vault Room</div>
-          <p class="analogy-desc">Biometric scanners, CCTV, and time-locked doors protect the most critical assets. A subset of IAM focused exclusively on elevated, privileged accounts.</p>
-        </div>
-      </div>
-
-      <div class="table-wrap reveal">
-        <table>
-          <thead>
-            <tr>
-              <th>Attribute</th>
-              <th>IAM</th>
-              <th>PAM</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Scope</td>
-              <td>All users across the organisation</td>
-              <td>Only privileged / admin accounts</td>
-            </tr>
-            <tr>
-              <td>Goal</td>
-              <td>Right people, right access, right time</td>
-              <td>Secure and monitor elevated access</td>
-            </tr>
-            <tr>
-              <td>Functions</td>
-              <td>Authentication, SSO, directory services, provisioning</td>
-              <td>Credential vaulting, session recording, JIT access</td>
-            </tr>
-            <tr>
-              <td>Tools</td>
-              <td>Microsoft Entra ID, Okta, Ping Identity</td>
-              <td>CyberArk, BeyondTrust, Delinea, HashiCorp Vault</td>
-            </tr>
-            <tr>
-              <td>Compliance</td>
-              <td>GDPR, ISO 27001, Cyber Essentials</td>
-              <td>NIST 800-53 AC-6, ISO 27001 A.9, PCI DSS Req. 7 &amp; 8</td>
-            </tr>
-            <tr>
-              <td>Analogy</td>
-              <td>"Who are you and what can you access?"</td>
-              <td>"You have the master key — let's watch and control how you use it."</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ THREE PILLARS ══ -->
-  <section class="pillars">
-    <div class="container">
-      <div class="section-label">Framework</div>
-      <h2>The Three Pillars of PAM</h2>
-      <p style="max-width: 60ch;">People, Technology, and Process work together. None of these pillars work in isolation — all three must be in place for PAM to be effective.</p>
-
-      <div class="pillars-grid reveal">
-        <div class="pillar-card people">
-          <div class="pillar-num">01</div>
-          <div class="pillar-icon">👥</div>
-          <div class="pillar-title">People</div>
-          <ul class="pillar-items">
-            <li>Admin security training</li>
-            <li>Separation of duties</li>
-            <li>Privileged user vetting</li>
-            <li>Clear escalation paths</li>
-            <li>Regular access reviews</li>
-          </ul>
-        </div>
-
-        <div class="pillar-card technology">
-          <div class="pillar-num">02</div>
-          <div class="pillar-icon">⚙️</div>
-          <div class="pillar-title">Technology</div>
-          <ul class="pillar-items">
-            <li>Password vaulting</li>
-            <li>MFA for privileged access</li>
-            <li>Session recording</li>
-            <li>Just-in-Time provisioning</li>
-            <li>Auto credential rotation</li>
-          </ul>
-        </div>
-
-        <div class="pillar-card process">
-          <div class="pillar-num">03</div>
-          <div class="pillar-icon">📝</div>
-          <div class="pillar-title">Process</div>
-          <ul class="pillar-items">
-            <li>Joiners / Movers / Leavers</li>
-            <li>Quarterly recertification</li>
-            <li>Incident response plans</li>
-            <li>Change management</li>
-            <li>Compliance auditing</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ PAM WORKFLOW ══ -->
-  <section class="workflow">
-    <div class="container">
-      <div class="section-label">Real-World Scenario</div>
-      <h2>PAM Workflow in Action</h2>
-      <p style="max-width: 65ch;">How PAM protects domain admin credentials through a Just-in-Time access model — no standing privileges, full monitoring.</p>
-
-      <div class="workflow-steps reveal">
-        <div class="step-item">
-          <div class="step-circle">1</div>
-          <div class="step-content">
-            <div class="step-title">No Standing Domain Admins</div>
-            <p class="step-desc">The Domain Admin Group is kept empty by default. There are no permanent domain admin accounts sitting idle and exploitable.</p>
-            <span class="step-badge">Zero Standing Privilege</span>
-          </div>
-        </div>
-
-        <div class="step-item">
-          <div class="step-circle">2</div>
-          <div class="step-content">
-            <div class="step-title">Access Request via PAM Portal</div>
-            <p class="step-desc">The IT admin submits a formal access request through the PAM portal, specifying the task they need to perform and the duration required.</p>
-            <span class="step-badge">Approval Workflow</span>
-          </div>
-        </div>
-
-        <div class="step-item">
-          <div class="step-circle">3</div>
-          <div class="step-content">
-            <div class="step-title">Temporary Access Granted</div>
-            <p class="step-desc">An ephemeral domain admin account is created. The session starts — "Admin Access for 45 Min" — tightly scoped to the specific task.</p>
-            <span class="step-badge">Just-in-Time Access</span>
-          </div>
-        </div>
-
-        <div class="step-item">
-          <div class="step-circle">4</div>
-          <div class="step-content">
-            <div class="step-title">Session Monitoring</div>
-            <p class="step-desc">All activity is recorded and logged in real time. Automated alerts fire for any suspicious or anomalous actions during the session.</p>
-            <span class="step-badge">Full Audit Trail</span>
-          </div>
-        </div>
-
-        <div class="step-item">
-          <div class="step-circle">5</div>
-          <div class="step-content">
-            <div class="step-title">Automatic Cleanup</div>
-            <p class="step-desc">When the session ends, the ephemeral account is automatically deleted and access expires. No residual credentials remain.</p>
-            <span class="step-badge">Auto Revocation</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ WHY PAM MATTERS ══ -->
-  <section class="why-pam">
-    <div class="container">
-      <div class="section-label">Key Takeaways</div>
-      <h2>Why PAM matters</h2>
-
-      <div class="why-grid">
-        <div>
-          <p>PAM allows organisations to give elevated permissions on a need-to-use basis only. This fundamentally limits the attack surface available to malicious actors.</p>
-          <p>A real-world PAM scenario: an IT admin needs temporary, highly privileged access to fix a critical problem — but the organisation wants to avoid giving them standing admin rights that could be compromised or abused.</p>
-          <p>With PAM, that admin gets exactly what they need, for exactly as long as they need it, under full observation — and nothing more.</p>
-        </div>
-
-        <div class="stat-block reveal">
-          <div class="stat-card">
-            <div class="stat-value">80%</div>
-            <div class="stat-label">of breaches involve privileged credentials</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">JIT</div>
-            <div class="stat-label">Just-in-Time access eliminates standing risk</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">0</div>
-            <div class="stat-label">standing admin accounts in a mature PAM model</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">3</div>
-            <div class="stat-label">pillars must align: People, Tech &amp; Process</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ REFERENCES ══ -->
-  <section style="padding: clamp(4rem,8vh,6rem) 0; border-top: 1px solid var(--border);">
-    <div class="container">
-      <div class="section-label">Sources</div>
-      <h2 style="font-size: clamp(1.4rem,3vw,2rem); margin-bottom: 2rem;">References</h2>
-
-      <div style="display: flex; flex-direction: column; gap: 1.2rem;" class="reveal">
-
-        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.4rem 1.6rem; display: flex; gap: 1rem; align-items: flex-start;">
-          <span style="font-family:'Syne',sans-serif; font-size:.7rem; font-weight:800; color:var(--accent); background:rgba(0,194,255,.1); border:1px solid rgba(0,194,255,.2); border-radius:6px; padding:.3rem .6rem; white-space:nowrap; flex-shrink:0;">CyberArk</span>
-          <p style="margin:0; font-size:.85rem; color:var(--muted); line-height:1.6;">CyberArk (n.d.). <em style="color:var(--text);">What is PAM? Privileged Access Management Definition.</em> [online] CyberArk. Available at: <a href="https://www.cyberark.com/what-is/privileged-access-management/" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">cyberark.com</a></p>
-        </div>
-
-        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.4rem 1.6rem; display: flex; gap: 1rem; align-items: flex-start;">
-          <span style="font-family:'Syne',sans-serif; font-size:.7rem; font-weight:800; color:var(--accent2); background:rgba(255,107,53,.1); border:1px solid rgba(255,107,53,.2); border-radius:6px; padding:.3rem .6rem; white-space:nowrap; flex-shrink:0;">Fortinet</span>
-          <p style="margin:0; font-size:.85rem; color:var(--muted); line-height:1.6;">Fortinet (2023). <em style="color:var(--text);">What is Privileged Access Management (PAM)?</em> Available at: <a href="https://www.fortinet.com/uk/resources/cyberglossary/privileged-access-management" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">fortinet.com</a> (Accessed: 14 April 2026).</p>
-        </div>
-
-        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.4rem 1.6rem; display: flex; gap: 1rem; align-items: flex-start;">
-          <span style="font-family:'Syne',sans-serif; font-size:.7rem; font-weight:800; color:#22d3a5; background:rgba(34,211,165,.1); border:1px solid rgba(34,211,165,.2); border-radius:6px; padding:.3rem .6rem; white-space:nowrap; flex-shrink:0;">NCSC</span>
-          <p style="margin:0; font-size:.85rem; color:var(--muted); line-height:1.6;">NCSC (2023). <em style="color:var(--text);">Use Privileged Access Management.</em> Available at: <a href="https://www.ncsc.gov.uk/collection/secure-system-administration/use-privileged-access-management" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">ncsc.gov.uk</a> (Accessed: 14 April 2026).</p>
-        </div>
-
-        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.4rem 1.6rem; display: flex; gap: 1rem; align-items: flex-start;">
-          <span style="font-family:'Syne',sans-serif; font-size:.7rem; font-weight:800; color:var(--accent3); background:rgba(124,58,237,.1); border:1px solid rgba(124,58,237,.2); border-radius:6px; padding:.3rem .6rem; white-space:nowrap; flex-shrink:0;">Microsoft</span>
-          <p style="margin:0; font-size:.85rem; color:var(--muted); line-height:1.6;">Microsoft (2025). <em style="color:var(--text);">What is Privileged Access Management (PAM)?</em> Available at: <a href="https://www.microsoft.com/en-us/security/business/security-101/what-is-privileged-access-management-pam" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">microsoft.com</a> (Accessed: 14 April 2026).</p>
-        </div>
-
-        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.4rem 1.6rem; display: flex; gap: 1rem; align-items: flex-start;">
-          <span style="font-family:'Syne',sans-serif; font-size:.7rem; font-weight:800; color:#f59e0b; background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.2); border-radius:6px; padding:.3rem .6rem; white-space:nowrap; flex-shrink:0;">CrowdStrike</span>
-          <p style="margin:0; font-size:.85rem; color:var(--muted); line-height:1.6;">Shastri, V. (2024). <em style="color:var(--text);">What is Privileged Access Management (PAM)?</em> [online] CrowdStrike. Available at: <a href="https://www.crowdstrike.com/en-us/cybersecurity-101/identity-protection/privileged-access-management-pam/" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">crowdstrike.com</a></p>
-        </div>
-
-      </div>
-    </div>
-  </section>
-
-  <!-- ══ FOOTER ══ -->
-  <footer>
-    <div class="container">
-      <div class="footer-logo">PAM Explained</div>
-      <p class="footer-sub">Sources: ISO/IEC 27001:2022 · NCSC 10 Steps · NIST SP 800-53</p>
-      <p class="footer-sub" style="margin-top:.6rem;">© 2026 PacketSniffers · All rights reserved</p>
-    </div>
-  </footer>
-
-  <script>
-    // Scroll reveal
-    const reveals = document.querySelectorAll('.reveal');
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>What is PAM & Why Should You Care?</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f4f7fb;
+        --surface: #ffffff;
+        --surface2: #e8f0f8;
+        --border: #c8d9ea;
+        --accent: #2e6fa3;
+        --accent2: #1a2f4e;
+        --accent3: #4a90c4;
+        --text: #1a2f4e;
+        --muted: #5a7a99;
+        --highlight: rgba(46, 111, 163, 0.07);
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-weight: 300;
+        line-height: 1.75;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* ── NOISE OVERLAY ── */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+        opacity: 0.4;
+      }
+
+      /* ── HERO ── */
+      .hero {
+        position: relative;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        padding: 5rem clamp(1.5rem, 8vw, 8rem) clamp(3rem, 8vh, 6rem);
+        overflow: hidden;
+      }
+
+      .hero-bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        background:
+          radial-gradient(
+            ellipse 70% 60% at 80% 20%,
+            rgba(46, 111, 163, 0.18) 0%,
+            transparent 70%
+          ),
+          radial-gradient(
+            ellipse 50% 50% at 10% 80%,
+            rgba(168, 204, 224, 0.4) 0%,
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse 80% 80% at 50% 50%,
+            rgba(26, 47, 78, 1) 40%,
+            transparent 100%
+          );
+      }
+
+      .hero-grid {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        background-image:
+          linear-gradient(var(--border) 1px, transparent 1px),
+          linear-gradient(90deg, var(--border) 1px, transparent 1px);
+        background-size: 60px 60px;
+        mask-image: radial-gradient(
+          ellipse 80% 80% at 50% 30%,
+          black 20%,
+          transparent 80%
+        );
+        opacity: 0.35;
+      }
+
+      .hero-tag {
+        position: relative;
+        z-index: 1;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(168, 204, 224, 0.25);
+        border: 1px solid rgba(46, 111, 163, 0.4);
+        color: #ffffff;
+        font-family: "Syne", sans-serif;
+        font-size: 0.7rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 0.35rem 0.85rem;
+        border-radius: 100px;
+        margin-bottom: 2rem;
+        width: fit-content;
+      }
+
+      .hero-tag::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        background: var(--accent);
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
         }
-      });
-    }, { threshold: 0.12 });
-    reveals.forEach(el => observer.observe(el));
-  </script>
-</body>
+        50% {
+          opacity: 0.4;
+          transform: scale(0.7);
+        }
+      }
+
+      .hero h1 {
+        position: relative;
+        z-index: 1;
+        font-family: "Syne", sans-serif;
+        font-size: clamp(2.8rem, 7vw, 6rem);
+        font-weight: 800;
+        line-height: 1.05;
+        letter-spacing: -0.03em;
+        max-width: 14ch;
+      }
+
+      .hero h1 em {
+        font-style: normal;
+        background: linear-gradient(
+          135deg,
+          #a8cce0 0%,
+          #ffffff 50%,
+          #a8cce0 100%
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .hero-meta {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        margin-top: 2.5rem;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .hero-meta span {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .scroll-hint {
+        position: relative;
+        z-index: 1;
+        margin-top: 3rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        font-size: 0.75rem;
+        color: var(--muted);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .scroll-hint::after {
+        content: "";
+        flex: 1;
+        max-width: 80px;
+        height: 1px;
+        background: linear-gradient(90deg, var(--muted), transparent);
+      }
+
+      /* ── LAYOUT ── */
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 0 clamp(1.5rem, 6vw, 5rem);
+      }
+
+      /* ── SECTION TITLES ── */
+      .section-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-family: "Syne", sans-serif;
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 1.2rem;
+      }
+
+      .section-label::before {
+        content: "";
+        width: 24px;
+        height: 1px;
+        background: var(--accent);
+      }
+
+      h2 {
+        font-family: "Syne", sans-serif;
+        font-size: clamp(1.8rem, 4vw, 2.8rem);
+        font-weight: 700;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        margin-bottom: 1.2rem;
+      }
+
+      p {
+        margin-bottom: 1.2rem;
+        color: #3a5570;
+      }
+      p:last-child {
+        margin-bottom: 0;
+      }
+
+      /* ── WHAT IS PAM ── */
+      .what-is-pam {
+        padding: clamp(5rem, 10vh, 8rem) 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .pam-intro-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4rem;
+        align-items: start;
+        margin-top: 3rem;
+      }
+
+      @media (max-width: 768px) {
+        .pam-intro-grid {
+          grid-template-columns: 1fr;
+          gap: 2.5rem;
+        }
+      }
+
+      /* ── BOUNCER CARDS ── */
+      .bouncer-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .bouncer-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--accent);
+        border-radius: 10px;
+        padding: 1.2rem 1.4rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        transition:
+          transform 0.2s,
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+
+      .bouncer-card:nth-child(2) {
+        border-left-color: var(--accent2);
+      }
+      .bouncer-card:nth-child(3) {
+        border-left-color: var(--accent3);
+      }
+
+      .bouncer-card:hover {
+        transform: translateX(4px);
+        box-shadow: -4px 0 20px rgba(0, 194, 255, 0.15);
+      }
+
+      .bouncer-card:nth-child(2):hover {
+        box-shadow: -4px 0 20px rgba(255, 107, 53, 0.15);
+      }
+      .bouncer-card:nth-child(3):hover {
+        box-shadow: -4px 0 20px rgba(124, 58, 237, 0.15);
+      }
+
+      .card-icon {
+        font-size: 1.4rem;
+        line-height: 1;
+        flex-shrink: 0;
+        margin-top: 0.1rem;
+      }
+
+      .card-title {
+        font-family: "Syne", sans-serif;
+        font-size: 0.85rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: var(--text);
+        margin-bottom: 0.3rem;
+      }
+
+      .card-body {
+        font-size: 0.85rem;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      /* ── QUOTE BOX ── */
+      .quote-box {
+        position: relative;
+        background: linear-gradient(
+          135deg,
+          rgba(46, 111, 163, 0.06) 0%,
+          rgba(168, 204, 224, 0.15) 100%
+        );
+        border: 1px solid rgba(46, 111, 163, 0.25);
+        border-radius: 16px;
+        padding: 2.5rem;
+        overflow: hidden;
+      }
+
+      .quote-box::before {
+        content: '"';
+        position: absolute;
+        top: -1rem;
+        left: 1.5rem;
+        font-family: "Syne", sans-serif;
+        font-size: 8rem;
+        font-weight: 800;
+        color: rgba(46, 111, 163, 0.12);
+        line-height: 1;
+        pointer-events: none;
+      }
+
+      .quote-text {
+        font-family: "Syne", sans-serif;
+        font-size: 1.2rem;
+        font-weight: 600;
+        line-height: 1.5;
+        color: var(--text);
+        margin-bottom: 1rem;
+      }
+
+      .quote-sub {
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin: 0;
+      }
+
+      /* ── IAM vs PAM ── */
+      .iam-pam {
+        padding: clamp(5rem, 10vh, 8rem) 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .analogy-strip {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 1.5rem;
+        align-items: center;
+        margin: 3rem 0;
+      }
+
+      @media (max-width: 640px) {
+        .analogy-strip {
+          grid-template-columns: 1fr;
+        }
+        .vs-circle {
+          display: none;
+        }
+      }
+
+      .analogy-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+        transition:
+          transform 0.3s,
+          box-shadow 0.3s;
+      }
+
+      .analogy-card:hover {
+        transform: translateY(-4px);
+      }
+
+      .analogy-card.iam {
+        border-top: 3px solid #4a90c4;
+      }
+      .analogy-card.pam {
+        border-top: 3px solid var(--accent2);
+      }
+
+      .analogy-card.iam:hover {
+        box-shadow: 0 12px 40px rgba(74, 144, 196, 0.15);
+      }
+      .analogy-card.pam:hover {
+        box-shadow: 0 12px 40px rgba(26, 47, 78, 0.15);
+      }
+
+      .analogy-emoji {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .analogy-title {
+        font-family: "Syne", sans-serif;
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 0.6rem;
+        color: var(--text);
+      }
+
+      .analogy-desc {
+        font-size: 0.85rem;
+        color: var(--muted);
+        line-height: 1.5;
+        margin: 0;
+      }
+
+      .vs-circle {
+        width: 48px;
+        height: 48px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "Syne", sans-serif;
+        font-size: 0.75rem;
+        font-weight: 800;
+        color: var(--muted);
+        flex-shrink: 0;
+      }
+
+      /* ── COMPARISON TABLE ── */
+      .table-wrap {
+        margin-top: 3rem;
+        overflow-x: auto;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+      }
+
+      thead tr {
+        background: #1a2f4e;
+      }
+
+      thead th {
+        font-family: "Syne", sans-serif;
+        font-size: 0.7rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        font-weight: 700;
+        padding: 1.1rem 1.4rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        color: #ffffff;
+      }
+
+      thead th:nth-child(2) {
+        color: #a8cce0;
+      }
+      thead th:nth-child(3) {
+        color: #7bb8d9;
+      }
+
+      tbody tr {
+        border-bottom: 1px solid var(--border);
+        transition: background 0.2s;
+      }
+
+      tbody tr:last-child {
+        border-bottom: none;
+      }
+      tbody tr:hover {
+        background: var(--highlight);
+      }
+
+      tbody td {
+        padding: 0.9rem 1.4rem;
+        color: #3a5570;
+        vertical-align: top;
+      }
+
+      tbody td:first-child {
+        font-family: "Syne", sans-serif;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      /* ── THREE PILLARS ── */
+      .pillars {
+        padding: clamp(5rem, 10vh, 8rem) 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .pillars-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        margin-top: 3rem;
+      }
+
+      @media (max-width: 768px) {
+        .pillars-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .pillar-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 2rem;
+        position: relative;
+        overflow: hidden;
+        transition:
+          transform 0.3s,
+          box-shadow 0.3s;
+      }
+
+      .pillar-card:hover {
+        transform: translateY(-6px);
+      }
+
+      .pillar-card.people {
+        border-top: 3px solid #4a90c4;
+      }
+      .pillar-card.technology {
+        border-top: 3px solid var(--accent);
+      }
+      .pillar-card.process {
+        border-top: 3px solid #1a2f4e;
+      }
+
+      .pillar-card.people:hover {
+        box-shadow: 0 16px 48px rgba(74, 144, 196, 0.15);
+      }
+      .pillar-card.technology:hover {
+        box-shadow: 0 16px 48px rgba(46, 111, 163, 0.15);
+      }
+      .pillar-card.process:hover {
+        box-shadow: 0 16px 48px rgba(26, 47, 78, 0.15);
+      }
+
+      .pillar-num {
+        position: absolute;
+        top: 1.2rem;
+        right: 1.4rem;
+        font-family: "Syne", sans-serif;
+        font-size: 3.5rem;
+        font-weight: 800;
+        color: rgba(255, 255, 255, 0.04);
+        line-height: 1;
+      }
+
+      .pillar-icon {
+        font-size: 2rem;
+        margin-bottom: 1.2rem;
+      }
+
+      .pillar-title {
+        font-family: "Syne", sans-serif;
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        color: var(--text);
+      }
+
+      .pillar-items {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+
+      .pillar-items li {
+        font-size: 0.82rem;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .pillar-items li::before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: currentColor;
+        flex-shrink: 0;
+      }
+
+      .people .pillar-items li::before {
+        color: #4a90c4;
+      }
+      .technology .pillar-items li::before {
+        color: var(--accent);
+      }
+      .process .pillar-items li::before {
+        color: #1a2f4e;
+      }
+
+      /* ── WORKFLOW ── */
+      .workflow {
+        padding: clamp(5rem, 10vh, 8rem) 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .workflow-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        margin-top: 3rem;
+        position: relative;
+      }
+
+      .workflow-steps::before {
+        content: "";
+        position: absolute;
+        left: 2rem;
+        top: 2.5rem;
+        bottom: 2.5rem;
+        width: 2px;
+        background: linear-gradient(to bottom, #4a90c4, #2e6fa3, #1a2f4e);
+      }
+
+      @media (max-width: 640px) {
+        .workflow-steps::before {
+          left: 1.5rem;
+        }
+      }
+
+      .step-item {
+        display: flex;
+        gap: 2rem;
+        padding: 1.5rem 0;
+      }
+
+      @media (max-width: 640px) {
+        .step-item {
+          gap: 1.2rem;
+        }
+      }
+
+      .step-circle {
+        width: 4rem;
+        height: 4rem;
+        background: var(--surface2);
+        border: 2px solid var(--border);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-family: "Syne", sans-serif;
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: var(--accent);
+        position: relative;
+        z-index: 1;
+        transition:
+          background 0.3s,
+          border-color 0.3s;
+      }
+
+      .step-item:hover .step-circle {
+        background: rgba(46, 111, 163, 0.12);
+        border-color: var(--accent);
+        box-shadow: 0 0 20px rgba(46, 111, 163, 0.25);
+      }
+
+      .step-content {
+        padding: 0.6rem 0;
+        flex: 1;
+      }
+
+      .step-title {
+        font-family: "Syne", sans-serif;
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 0.4rem;
+      }
+
+      .step-desc {
+        font-size: 0.875rem;
+        color: var(--muted);
+        line-height: 1.6;
+        margin: 0;
+      }
+
+      .step-badge {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(46, 111, 163, 0.1);
+        border: 1px solid rgba(46, 111, 163, 0.25);
+        color: var(--accent);
+        font-size: 0.65rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-family: "Syne", sans-serif;
+        font-weight: 600;
+        padding: 0.2rem 0.6rem;
+        border-radius: 100px;
+        margin-top: 0.5rem;
+      }
+
+      /* ── WHY PAM MATTERS ── */
+      .why-pam {
+        padding: clamp(5rem, 10vh, 8rem) 0;
+      }
+
+      .why-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3rem;
+        margin-top: 3rem;
+        align-items: center;
+      }
+
+      @media (max-width: 768px) {
+        .why-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .stat-block {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.2rem;
+      }
+
+      .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.6rem;
+        transition: transform 0.2s;
+      }
+
+      .stat-card:hover {
+        transform: scale(1.03);
+      }
+
+      .stat-card:nth-child(1) {
+        border-top: 2px solid var(--accent);
+      }
+      .stat-card:nth-child(2) {
+        border-top: 2px solid #4a90c4;
+      }
+      .stat-card:nth-child(3) {
+        border-top: 2px solid var(--accent2);
+      }
+      .stat-card:nth-child(4) {
+        border-top: 2px solid #a8cce0;
+      }
+
+      .stat-value {
+        font-family: "Syne", sans-serif;
+        font-size: 2rem;
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 0.4rem;
+      }
+
+      .stat-card:nth-child(1) .stat-value {
+        color: var(--accent);
+      }
+      .stat-card:nth-child(2) .stat-value {
+        color: #4a90c4;
+      }
+      .stat-card:nth-child(3) .stat-value {
+        color: var(--accent2);
+      }
+      .stat-card:nth-child(4) .stat-value {
+        color: #2e6fa3;
+      }
+
+      .stat-label {
+        font-size: 0.78rem;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+
+      /* ── FOOTER ── */
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 3rem 0;
+        text-align: center;
+        background: #1a2f4e;
+      }
+
+      .footer-logo {
+        font-family: "Syne", sans-serif;
+        font-size: 1.3rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #a8cce0, #ffffff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 0.8rem;
+      }
+
+      .footer-sub {
+        font-size: 0.8rem;
+        color: #a8cce0;
+      }
+
+      /* ── ANIMATIONS ── */
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(24px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .fade-up {
+        opacity: 0;
+        animation: fadeUp 0.7s ease forwards;
+      }
+
+      .fade-up:nth-child(1) {
+        animation-delay: 0.1s;
+      }
+      .fade-up:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .fade-up:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      .fade-up:nth-child(4) {
+        animation-delay: 0.4s;
+      }
+      .fade-up:nth-child(5) {
+        animation-delay: 0.5s;
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(20px);
+        transition:
+          opacity 0.6s ease,
+          transform 0.6s ease;
+      }
+
+      .reveal.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ══ NAV ══ -->
+    <nav
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        background: rgba(26, 47, 78, 0.95);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(168, 204, 224, 0.15);
+        padding: 0.9rem clamp(1.5rem, 6vw, 5rem);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      "
+    >
+      <div style="display: flex; align-items: center; gap: 0.75rem">
+        <img
+          src="packet-sniffer-logo.png"
+          alt="The Packet Sniffers"
+          style="height: 32px; width: auto; filter: brightness(0) invert(1)"
+        />
+        <span
+          style="
+            font-family: &quot;Syne&quot;, sans-serif;
+            font-weight: 800;
+            font-size: 1rem;
+            color: #ffffff;
+            letter-spacing: -0.01em;
+          "
+          >The Packet Sniffers</span
+        >
+      </div>
+      <span
+        style="
+          font-family: &quot;Syne&quot;, sans-serif;
+          font-size: 0.65rem;
+          font-weight: 600;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #a8cce0;
+          background: rgba(168, 204, 224, 0.1);
+          border: 1px solid rgba(168, 204, 224, 0.2);
+          padding: 0.3rem 0.8rem;
+          border-radius: 100px;
+        "
+        >PAM Blog</span
+      >
+    </nav>
+
+    <!-- ══ HERO ══ -->
+    <section class="hero">
+      <div class="hero-bg"></div>
+      <div class="hero-grid"></div>
+
+      <div class="fade-up">
+        <img
+          src="packet-sniffer-logo.png"
+          alt="The Packet Sniffers"
+          style="
+            width: clamp(120px, 18vw, 200px);
+            margin-bottom: 2rem;
+            filter: drop-shadow(0 4px 24px rgba(0, 0, 0, 0.4));
+          "
+        />
+      </div>
+
+      <div class="fade-up">
+        <div class="hero-tag">Cybersecurity Explainer</div>
+      </div>
+
+      <h1 class="fade-up">
+        What is <em>Privileged Access Management</em> and why should you care?
+      </h1>
+
+      <div class="hero-meta fade-up">
+        <span>🔒 PAM Deep Dive</span>
+        <span>·</span>
+        <span>5 min read</span>
+        <span>·</span>
+        <span>Security Fundamentals</span>
+      </div>
+
+      <div class="scroll-hint fade-up">Scroll to explore</div>
+    </section>
+
+    <!-- ══ WHAT IS PAM ══ -->
+    <section class="what-is-pam">
+      <div class="container">
+        <div class="section-label">Foundation</div>
+        <h2>The gatekeeper for the keys to the kingdom</h2>
+
+        <div class="pam-intro-grid">
+          <div>
+            <p>
+              Your daily interactions online and at work are often shaped by
+              Privileged Access Management. You may have experienced the effects
+              — and sometimes the frustrations — without realising what's being
+              controlled behind the scenes.
+            </p>
+            <p>
+              PAM makes sure that the most "powerful" accounts can only be used
+              by the right people, at the right time, and only for the specific
+              tasks they are allowed to perform.
+            </p>
+            <p>
+              It does this by controlling access, monitoring activity and
+              shutting down anything that looks risky or unexpected.
+            </p>
+            <p>
+              If an attacker compromises a normal user account, the damage they
+              can do is limited. But if they get hold of an admin account, they
+              can take over everything. PAM prevents that escalation.
+            </p>
+          </div>
+
+          <div class="bouncer-cards reveal">
+            <div class="bouncer-card fade-up">
+              <div class="card-icon">🚫</div>
+              <div>
+                <div class="card-title">Bouncer for Dangerous Accounts</div>
+                <div class="card-body">
+                  Domain admins, database admins, root and cloud super-users are
+                  guarded at the door.
+                </div>
+              </div>
+            </div>
+            <div class="bouncer-card fade-up">
+              <div class="card-icon">⚖️</div>
+              <div>
+                <div class="card-title">Enforces Least Privilege</div>
+                <div class="card-body">
+                  Users get only the minimum access they need — nothing more,
+                  nothing less.
+                </div>
+              </div>
+            </div>
+            <div class="bouncer-card fade-up">
+              <div class="card-icon">📋</div>
+              <div>
+                <div class="card-title">Records & Audits Everything</div>
+                <div class="card-body">
+                  Every privileged action is logged so you always know who did
+                  what, and when.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="quote-box reveal" style="margin-top: 4rem">
+          <div class="quote-text">
+            Simply put, PAM is the gatekeeper for the keys to the kingdom.
+          </div>
+          <p class="quote-sub">
+            The most critical accounts in any organisation deserve the strictest
+            protection.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ IAM vs PAM ══ -->
+    <section class="iam-pam">
+      <div class="container">
+        <div class="section-label">Comparison</div>
+        <h2>PAM vs IAM — What's the difference?</h2>
+        <p style="max-width: 60ch">
+          IAM and PAM sound similar but serve different purposes. Think of IAM
+          as identity validation and PAM as resource access validation.
+        </p>
+
+        <div class="analogy-strip reveal">
+          <div class="analogy-card iam">
+            <div class="analogy-emoji">🏢</div>
+            <div class="analogy-title">IAM — Reception Desk</div>
+            <p class="analogy-desc">
+              Verifies who you are, issues you a badge, and determines which
+              floors and rooms you can access. Applies to every employee,
+              contractor, and system identity.
+            </p>
+          </div>
+
+          <div class="vs-circle">VS</div>
+
+          <div class="analogy-card pam">
+            <div class="analogy-emoji">🔐</div>
+            <div class="analogy-title">PAM — The Vault Room</div>
+            <p class="analogy-desc">
+              Biometric scanners, CCTV, and time-locked doors protect the most
+              critical assets. A subset of IAM focused exclusively on elevated,
+              privileged accounts.
+            </p>
+          </div>
+        </div>
+
+        <div class="table-wrap reveal">
+          <table>
+            <thead>
+              <tr>
+                <th>Attribute</th>
+                <th>IAM</th>
+                <th>PAM</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Scope</td>
+                <td>All users across the organisation</td>
+                <td>Only privileged / admin accounts</td>
+              </tr>
+              <tr>
+                <td>Goal</td>
+                <td>Right people, right access, right time</td>
+                <td>Secure and monitor elevated access</td>
+              </tr>
+              <tr>
+                <td>Functions</td>
+                <td>Authentication, SSO, directory services, provisioning</td>
+                <td>Credential vaulting, session recording, JIT access</td>
+              </tr>
+              <tr>
+                <td>Tools</td>
+                <td>Microsoft Entra ID, Okta, Ping Identity</td>
+                <td>CyberArk, BeyondTrust, Delinea, HashiCorp Vault</td>
+              </tr>
+              <tr>
+                <td>Compliance</td>
+                <td>GDPR, ISO 27001, Cyber Essentials</td>
+                <td>NIST 800-53 AC-6, ISO 27001 A.9, PCI DSS Req. 7 &amp; 8</td>
+              </tr>
+              <tr>
+                <td>Analogy</td>
+                <td>"Who are you and what can you access?"</td>
+                <td>
+                  "You have the master key — let's watch and control how you use
+                  it."
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ THREE PILLARS ══ -->
+    <section class="pillars">
+      <div class="container">
+        <div class="section-label">Framework</div>
+        <h2>The Three Pillars of PAM</h2>
+        <p style="max-width: 60ch">
+          People, Technology, and Process work together. None of these pillars
+          work in isolation — all three must be in place for PAM to be
+          effective.
+        </p>
+
+        <div class="pillars-grid reveal">
+          <div class="pillar-card people">
+            <div class="pillar-num">01</div>
+            <div class="pillar-icon">👥</div>
+            <div class="pillar-title">People</div>
+            <ul class="pillar-items">
+              <li>Admin security training</li>
+              <li>Separation of duties</li>
+              <li>Privileged user vetting</li>
+              <li>Clear escalation paths</li>
+              <li>Regular access reviews</li>
+            </ul>
+          </div>
+
+          <div class="pillar-card technology">
+            <div class="pillar-num">02</div>
+            <div class="pillar-icon">⚙️</div>
+            <div class="pillar-title">Technology</div>
+            <ul class="pillar-items">
+              <li>Password vaulting</li>
+              <li>MFA for privileged access</li>
+              <li>Session recording</li>
+              <li>Just-in-Time provisioning</li>
+              <li>Auto credential rotation</li>
+            </ul>
+          </div>
+
+          <div class="pillar-card process">
+            <div class="pillar-num">03</div>
+            <div class="pillar-icon">📝</div>
+            <div class="pillar-title">Process</div>
+            <ul class="pillar-items">
+              <li>Joiners / Movers / Leavers</li>
+              <li>Quarterly recertification</li>
+              <li>Incident response plans</li>
+              <li>Change management</li>
+              <li>Compliance auditing</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ PAM WORKFLOW ══ -->
+    <section class="workflow">
+      <div class="container">
+        <div class="section-label">Real-World Scenario</div>
+        <h2>PAM Workflow in Action</h2>
+        <p style="max-width: 65ch">
+          How PAM protects domain admin credentials through a Just-in-Time
+          access model — no standing privileges, full monitoring.
+        </p>
+
+        <div class="workflow-steps reveal">
+          <div class="step-item">
+            <div class="step-circle">1</div>
+            <div class="step-content">
+              <div class="step-title">No Standing Domain Admins</div>
+              <p class="step-desc">
+                The Domain Admin Group is kept empty by default. There are no
+                permanent domain admin accounts sitting idle and exploitable.
+              </p>
+              <span class="step-badge">Zero Standing Privilege</span>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-circle">2</div>
+            <div class="step-content">
+              <div class="step-title">Access Request via PAM Portal</div>
+              <p class="step-desc">
+                The IT admin submits a formal access request through the PAM
+                portal, specifying the task they need to perform and the
+                duration required.
+              </p>
+              <span class="step-badge">Approval Workflow</span>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-circle">3</div>
+            <div class="step-content">
+              <div class="step-title">Temporary Access Granted</div>
+              <p class="step-desc">
+                An ephemeral domain admin account is created. The session starts
+                — "Admin Access for 45 Min" — tightly scoped to the specific
+                task.
+              </p>
+              <span class="step-badge">Just-in-Time Access</span>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-circle">4</div>
+            <div class="step-content">
+              <div class="step-title">Session Monitoring</div>
+              <p class="step-desc">
+                All activity is recorded and logged in real time. Automated
+                alerts fire for any suspicious or anomalous actions during the
+                session.
+              </p>
+              <span class="step-badge">Full Audit Trail</span>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-circle">5</div>
+            <div class="step-content">
+              <div class="step-title">Automatic Cleanup</div>
+              <p class="step-desc">
+                When the session ends, the ephemeral account is automatically
+                deleted and access expires. No residual credentials remain.
+              </p>
+              <span class="step-badge">Auto Revocation</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ WHY PAM MATTERS ══ -->
+    <section class="why-pam">
+      <div class="container">
+        <div class="section-label">Key Takeaways</div>
+        <h2>Why PAM matters</h2>
+
+        <div class="why-grid">
+          <div>
+            <p>
+              PAM allows organisations to give elevated permissions on a
+              need-to-use basis only. This fundamentally limits the attack
+              surface available to malicious actors.
+            </p>
+            <p>
+              A real-world PAM scenario: an IT admin needs temporary, highly
+              privileged access to fix a critical problem — but the organisation
+              wants to avoid giving them standing admin rights that could be
+              compromised or abused.
+            </p>
+            <p>
+              With PAM, that admin gets exactly what they need, for exactly as
+              long as they need it, under full observation — and nothing more.
+            </p>
+          </div>
+
+          <div class="stat-block reveal">
+            <div class="stat-card">
+              <div class="stat-value">80%</div>
+              <div class="stat-label">
+                of breaches involve privileged credentials
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">JIT</div>
+              <div class="stat-label">
+                Just-in-Time access eliminates standing risk
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">0</div>
+              <div class="stat-label">
+                standing admin accounts in a mature PAM model
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">3</div>
+              <div class="stat-label">
+                pillars must align: People, Tech &amp; Process
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ REFERENCES ══ -->
+    <section
+      style="
+        padding: clamp(4rem, 8vh, 6rem) 0;
+        border-top: 1px solid var(--border);
+      "
+    >
+      <div class="container">
+        <div class="section-label">Sources</div>
+        <h2 style="font-size: clamp(1.4rem, 3vw, 2rem); margin-bottom: 2rem">
+          References
+        </h2>
+
+        <div
+          style="display: flex; flex-direction: column; gap: 1.2rem"
+          class="reveal"
+        >
+          <div
+            style="
+              background: var(--surface);
+              border: 1px solid var(--border);
+              border-radius: 12px;
+              padding: 1.4rem 1.6rem;
+              display: flex;
+              gap: 1rem;
+              align-items: flex-start;
+            "
+          >
+            <span
+              style="
+                font-family: &quot;Syne&quot;, sans-serif;
+                font-size: 0.7rem;
+                font-weight: 800;
+                color: var(--accent);
+                background: rgba(0, 194, 255, 0.1);
+                border: 1px solid rgba(0, 194, 255, 0.2);
+                border-radius: 6px;
+                padding: 0.3rem 0.6rem;
+                white-space: nowrap;
+                flex-shrink: 0;
+              "
+              >CyberArk</span
+            >
+            <p
+              style="
+                margin: 0;
+                font-size: 0.85rem;
+                color: var(--muted);
+                line-height: 1.6;
+              "
+            >
+              CyberArk (n.d.).
+              <em style="color: var(--text)"
+                >What is PAM? Privileged Access Management Definition.</em
+              >
+              [online] CyberArk. Available at:
+              <a
+                href="https://www.cyberark.com/what-is/privileged-access-management/"
+                target="_blank"
+                rel="noopener"
+                style="color: var(--accent); text-decoration: none"
+                >cyberark.com</a
+              >
+            </p>
+          </div>
+
+          <div
+            style="
+              background: var(--surface);
+              border: 1px solid var(--border);
+              border-radius: 12px;
+              padding: 1.4rem 1.6rem;
+              display: flex;
+              gap: 1rem;
+              align-items: flex-start;
+            "
+          >
+            <span
+              style="
+                font-family: &quot;Syne&quot;, sans-serif;
+                font-size: 0.7rem;
+                font-weight: 800;
+                color: var(--accent2);
+                background: rgba(255, 107, 53, 0.1);
+                border: 1px solid rgba(255, 107, 53, 0.2);
+                border-radius: 6px;
+                padding: 0.3rem 0.6rem;
+                white-space: nowrap;
+                flex-shrink: 0;
+              "
+              >Fortinet</span
+            >
+            <p
+              style="
+                margin: 0;
+                font-size: 0.85rem;
+                color: var(--muted);
+                line-height: 1.6;
+              "
+            >
+              Fortinet (2023).
+              <em style="color: var(--text)"
+                >What is Privileged Access Management (PAM)?</em
+              >
+              Available at:
+              <a
+                href="https://www.fortinet.com/uk/resources/cyberglossary/privileged-access-management"
+                target="_blank"
+                rel="noopener"
+                style="color: var(--accent); text-decoration: none"
+                >fortinet.com</a
+              >
+              (Accessed: 14 April 2026).
+            </p>
+          </div>
+
+          <div
+            style="
+              background: var(--surface);
+              border: 1px solid var(--border);
+              border-radius: 12px;
+              padding: 1.4rem 1.6rem;
+              display: flex;
+              gap: 1rem;
+              align-items: flex-start;
+            "
+          >
+            <span
+              style="
+                font-family: &quot;Syne&quot;, sans-serif;
+                font-size: 0.7rem;
+                font-weight: 800;
+                color: #22d3a5;
+                background: rgba(34, 211, 165, 0.1);
+                border: 1px solid rgba(34, 211, 165, 0.2);
+                border-radius: 6px;
+                padding: 0.3rem 0.6rem;
+                white-space: nowrap;
+                flex-shrink: 0;
+              "
+              >NCSC</span
+            >
+            <p
+              style="
+                margin: 0;
+                font-size: 0.85rem;
+                color: var(--muted);
+                line-height: 1.6;
+              "
+            >
+              NCSC (2023).
+              <em style="color: var(--text)"
+                >Use Privileged Access Management.</em
+              >
+              Available at:
+              <a
+                href="https://www.ncsc.gov.uk/collection/secure-system-administration/use-privileged-access-management"
+                target="_blank"
+                rel="noopener"
+                style="color: var(--accent); text-decoration: none"
+                >ncsc.gov.uk</a
+              >
+              (Accessed: 14 April 2026).
+            </p>
+          </div>
+
+          <div
+            style="
+              background: var(--surface);
+              border: 1px solid var(--border);
+              border-radius: 12px;
+              padding: 1.4rem 1.6rem;
+              display: flex;
+              gap: 1rem;
+              align-items: flex-start;
+            "
+          >
+            <span
+              style="
+                font-family: &quot;Syne&quot;, sans-serif;
+                font-size: 0.7rem;
+                font-weight: 800;
+                color: var(--accent3);
+                background: rgba(124, 58, 237, 0.1);
+                border: 1px solid rgba(124, 58, 237, 0.2);
+                border-radius: 6px;
+                padding: 0.3rem 0.6rem;
+                white-space: nowrap;
+                flex-shrink: 0;
+              "
+              >Microsoft</span
+            >
+            <p
+              style="
+                margin: 0;
+                font-size: 0.85rem;
+                color: var(--muted);
+                line-height: 1.6;
+              "
+            >
+              Microsoft (2025).
+              <em style="color: var(--text)"
+                >What is Privileged Access Management (PAM)?</em
+              >
+              Available at:
+              <a
+                href="https://www.microsoft.com/en-us/security/business/security-101/what-is-privileged-access-management-pam"
+                target="_blank"
+                rel="noopener"
+                style="color: var(--accent); text-decoration: none"
+                >microsoft.com</a
+              >
+              (Accessed: 14 April 2026).
+            </p>
+          </div>
+
+          <div
+            style="
+              background: var(--surface);
+              border: 1px solid var(--border);
+              border-radius: 12px;
+              padding: 1.4rem 1.6rem;
+              display: flex;
+              gap: 1rem;
+              align-items: flex-start;
+            "
+          >
+            <span
+              style="
+                font-family: &quot;Syne&quot;, sans-serif;
+                font-size: 0.7rem;
+                font-weight: 800;
+                color: #f59e0b;
+                background: rgba(245, 158, 11, 0.1);
+                border: 1px solid rgba(245, 158, 11, 0.2);
+                border-radius: 6px;
+                padding: 0.3rem 0.6rem;
+                white-space: nowrap;
+                flex-shrink: 0;
+              "
+              >CrowdStrike</span
+            >
+            <p
+              style="
+                margin: 0;
+                font-size: 0.85rem;
+                color: var(--muted);
+                line-height: 1.6;
+              "
+            >
+              Shastri, V. (2024).
+              <em style="color: var(--text)"
+                >What is Privileged Access Management (PAM)?</em
+              >
+              [online] CrowdStrike. Available at:
+              <a
+                href="https://www.crowdstrike.com/en-us/cybersecurity-101/identity-protection/privileged-access-management-pam/"
+                target="_blank"
+                rel="noopener"
+                style="color: var(--accent); text-decoration: none"
+                >crowdstrike.com</a
+              >
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ FOOTER ══ -->
+    <footer>
+      <div class="container">
+        <div class="footer-logo">PAM Explained</div>
+        <p class="footer-sub">
+          Sources: ISO/IEC 27001:2022 · NCSC 10 Steps · NIST SP 800-53
+        </p>
+        <p class="footer-sub" style="margin-top: 0.6rem">
+          © 2026 PacketSniffers · All rights reserved
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      // Scroll reveal
+      const reveals = document.querySelectorAll(".reveal");
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("visible");
+            }
+          });
+        },
+        { threshold: 0.12 },
+      );
+      reveals.forEach((el) => observer.observe(el));
+    </script>
+  </body>
 </html>
